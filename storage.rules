@@ -1,0 +1,29 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function esNombreFotoValido(fileName) {
+      return fileName.matches('^[0-9]{7,8}\\.jpg$');
+    }
+
+    function esFotoValida() {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size < 2 * 1024 * 1024;
+    }
+
+    match /fotos_comedor/{fileName} {
+      // Alta y reintento de la misma selfie. Sin cuentas de Google.
+      allow create, update: if esNombreFotoValido(fileName) && esFotoValida();
+
+      // Necesario para getDownloadURL después de subir y para el admin.
+      allow get: if esNombreFotoValido(fileName);
+      allow list: if request.auth != null;
+
+      allow delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

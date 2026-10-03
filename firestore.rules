@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function esDniValido(dni) {
+      return dni is string && dni.matches('^[0-9]{7,8}$');
+    }
+
+    function esEmailValido(email) {
+      return email is string
+        && email.size() > 5
+        && email.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$');
+    }
+
+    function esPersonaValida() {
+      let data = request.resource.data;
+      return esDniValido(data.dni)
+        && request.resource.id == data.dni
+        && data.nombre is string && data.nombre.size() >= 2 && data.nombre.size() <= 80
+        && data.apellido is string && data.apellido.size() >= 2 && data.apellido.size() <= 80
+        && data.departamento is string && data.departamento.size() >= 2 && data.departamento.size() <= 80
+        && esEmailValido(data.email)
+        && data.fotoUrl is string && data.fotoUrl.size() > 10
+        && data.fechaRegistro is timestamp;
+    }
+
+    function esAdmin() {
+      return request.auth != null;
+    }
+
+    match /personas/{dni} {
+      // Alta pública controlada: Document ID = DNI y payload validado.
+      allow create: if esPersonaValida();
+
+      // Lectura puntual para detectar duplicados en el auto-registro.
+      allow get: if esDniValido(dni);
+
+      // Padrón completo solo para el administrador autenticado.
+      allow list: if esAdmin();
+
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
